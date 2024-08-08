@@ -1,2 +1,2 @@
 # atelier
-Brewing something
+A studio for practice
