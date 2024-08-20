@@ -71,8 +71,6 @@ func Write(path string, img image.Image) {
 	if err != nil {
 		panic(err)
 	}
-
-	time.Sleep(time.Second * 1)
 }
 
 func Grayscale(path string, img image.Image) image.Image {

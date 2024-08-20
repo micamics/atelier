@@ -1,4 +1,4 @@
-package fifo
+package fofi
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"github.com/micamics/atelier/golang/concurrency/model"
 )
 
-func ExecuteFanInFanOut() {
+func ExecuteFanOutFanIn() {
 	numWorkers := 4
 	doneChan := make(chan bool)
 	defer close(doneChan)
@@ -19,18 +19,15 @@ func ExecuteFanInFanOut() {
 		"images/image4.png",
 	}
 
-	imgChan := model.PrepareImages(imagePaths, "fifo/output/")
-	workers := make([]<-chan model.Image, numWorkers)
+	imgChan := model.PrepareImages(imagePaths, "fofi/output/")
+	resizeWorkers := make([]<-chan model.Image, numWorkers)
 
 	for i := 0; i < numWorkers; i++ {
-		workers[i] = resizeImages(doneChan, imgChan)
+		resizeWorkers[i] = resizeImages(doneChan, imgChan)
 	}
 
-	for i := 0; i < numWorkers; i++ {
-		workers[i] = grayscaleImages(doneChan, fanIn(doneChan, workers...))
-	}
-
-	processedImages := writeImages(doneChan, fanIn(doneChan, workers...))
+	grayedImgChan := grayscaleImages(doneChan, fanIn(doneChan, resizeWorkers...))
+	processedImages := writeImages(doneChan, grayedImgChan)
 	for img := range processedImages {
 		fmt.Println("processed image: ", img.Name)
 	}
@@ -83,14 +80,11 @@ func fanIn(doneChan <-chan bool, fannedOutChannels ...<-chan model.Image) <-chan
 
 	wg.Add(len(fannedOutChannels))
 	outImages := make(chan model.Image)
+
 	multiplex := func(ch <-chan model.Image) {
 		defer wg.Done()
-		for i := range ch {
-			select {
-			case <-doneChan:
-				return
-			case outImages <- i:
-			}
+		for img := range orDone(doneChan, ch) {
+			outImages <- img
 		}
 	}
 
